@@ -1,5 +1,5 @@
 import React from "react";
-import { Bookmark, Star, Clapperboard, Trash2, ArrowRight } from "lucide-react";
+import { Bookmark, Star, Clapperboard, ArrowRight } from "lucide-react";
 import MovieCard from "./MovieCard";
 
 export default function WatchlistView({
@@ -69,11 +69,11 @@ export default function WatchlistView({
           </div>
           <div>
             <h1 style={{ fontSize: "1.8rem", margin: 0 }}>
-              {isWatchlist ? "My Watchlist" : "My Rated Movies"}
+              {isWatchlist ? "My Watch Later List" : "My Rated Movies"}
             </h1>
             <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)", marginTop: "4px" }}>
               {isWatchlist
-                ? "Movies and cinema you have bookmarked to enjoy later."
+                ? "Movies and cinema you have saved to watch later."
                 : "Films you have personally reviewed and rated on CinemaSathi."}
             </p>
           </div>
@@ -160,13 +160,13 @@ export default function WatchlistView({
 
           <h3 style={{ fontSize: "1.4rem", margin: 0 }}>
             {isWatchlist
-              ? "Your watchlist is empty"
+              ? "Your Watch Later list is empty"
               : "You haven't rated any movies yet"}
           </h3>
 
           <p style={{ maxWidth: "460px", color: "var(--text-secondary)", margin: 0 }}>
             {isWatchlist
-              ? "Discover blockbusters and timeless classics, click the bookmark icon on any movie card to build your personalized watchlist."
+              ? "Discover blockbusters and timeless classics, click Watch Later on any movie card or detail view to build your collection."
               : "Browse any movie, click into details, and assign your personal 10-star rating to track what you have seen."}
           </p>
 

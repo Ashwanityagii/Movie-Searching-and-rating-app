@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { Star, Bookmark, Play, Heart, Film } from "lucide-react";
+import { Star, Bookmark, Play, Heart } from "lucide-react";
 
 export default function MovieCard({
   movie,
   userRating,
   inWatchlist,
   isFavorite,
+  ranking,
   onSelectMovie,
   onToggleWatchlist,
   onToggleFavorite,
@@ -87,6 +88,23 @@ export default function MovieCard({
         >
           {/* Rating Badge */}
           <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+            {ranking && (
+              <div
+                className="badge"
+                style={{
+                  background: "linear-gradient(135deg, #e11d48, #f59e0b)",
+                  color: "#ffffff",
+                  fontSize: "0.72rem",
+                  fontWeight: 800,
+                  padding: "0.25rem 0.55rem",
+                  borderRadius: "var(--radius-sm)",
+                  letterSpacing: "0.03em",
+                  boxShadow: "0 2px 8px rgba(225, 29, 72, 0.45)"
+                }}
+              >
+                #{ranking} Trending
+              </div>
+            )}
             <div
               className="badge badge-gold"
               style={{
@@ -147,22 +165,24 @@ export default function MovieCard({
 
             <button
               type="button"
-              aria-label="Add to watchlist"
+              aria-label={inWatchlist ? "Remove from Watch Later" : "Add to Watch Later"}
+              title={inWatchlist ? "In Watch Later" : "Watch Later"}
               onClick={(e) => {
                 e.stopPropagation();
-                onToggleWatchlist(movie.imdbID);
+                onToggleWatchlist(movie);
               }}
               style={{
                 width: 32,
                 height: 32,
                 borderRadius: "var(--radius-full)",
-                background: "rgba(10, 13, 20, 0.8)",
+                background: inWatchlist ? "rgba(6, 182, 212, 0.25)" : "rgba(10, 13, 20, 0.8)",
                 backdropFilter: "blur(8px)",
-                border: "1px solid var(--border-glass)",
+                border: inWatchlist ? "1px solid var(--accent-cyan)" : "1px solid var(--border-glass)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: inWatchlist ? "var(--accent-cyan)" : "#cbd5e1"
+                color: inWatchlist ? "var(--accent-cyan)" : "#cbd5e1",
+                cursor: "pointer"
               }}
             >
               <Bookmark
@@ -174,18 +194,21 @@ export default function MovieCard({
           </div>
         </div>
 
-        {/* Hover Trailer Play Button */}
+        {/* Hover Trailer & Watch Later Overlay */}
         <div
           className="card-play-overlay"
           style={{
             position: "absolute",
             inset: 0,
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
+            gap: "0.55rem",
             opacity: 0,
             transition: "opacity 0.25s ease",
-            background: "rgba(8, 11, 17, 0.45)"
+            background: "rgba(8, 11, 17, 0.65)",
+            padding: "0.5rem"
           }}
         >
           <button
@@ -196,15 +219,37 @@ export default function MovieCard({
             }}
             className="btn btn-crimson"
             style={{
-              padding: "0.6rem 1rem",
-              fontSize: "0.85rem",
+              padding: "0.55rem 0.95rem",
+              fontSize: "0.82rem",
               borderRadius: "var(--radius-full)",
-              transform: "scale(0.9)",
+              transform: "scale(0.95)",
               transition: "transform 0.2s ease"
             }}
           >
-            <Play size={15} fill="#ffffff" />
+            <Play size={14} fill="#ffffff" />
             Watch Trailer
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleWatchlist(movie);
+            }}
+            className="btn btn-secondary"
+            style={{
+              padding: "0.45rem 0.9rem",
+              fontSize: "0.8rem",
+              borderRadius: "var(--radius-full)",
+              background: inWatchlist ? "rgba(6, 182, 212, 0.25)" : "rgba(15, 23, 42, 0.85)",
+              color: inWatchlist ? "var(--accent-cyan)" : "#ffffff",
+              borderColor: inWatchlist ? "var(--accent-cyan)" : "var(--border-glass)",
+              transform: "scale(0.95)",
+              transition: "all 0.2s ease"
+            }}
+          >
+            <Bookmark size={13} fill={inWatchlist ? "var(--accent-cyan)" : "none"} />
+            <span>{inWatchlist ? "In Watch Later" : "Watch Later"}</span>
           </button>
         </div>
       </div>
@@ -223,6 +268,7 @@ export default function MovieCard({
         <div>
           <h3
             title={movie.title}
+            className="card-movie-title"
             style={{
               fontSize: "1rem",
               fontWeight: 700,
@@ -230,7 +276,8 @@ export default function MovieCard({
               marginBottom: "0.35rem",
               whiteSpace: "nowrap",
               overflow: "hidden",
-              textOverflow: "ellipsis"
+              textOverflow: "ellipsis",
+              color: "var(--text-primary)"
             }}
           >
             {movie.title}
@@ -269,7 +316,7 @@ export default function MovieCard({
                   fontSize: "0.7rem",
                   padding: "0.15rem 0.5rem",
                   borderRadius: "4px",
-                  background: "rgba(255, 255, 255, 0.05)",
+                  background: "var(--bg-tertiary)",
                   color: "var(--text-secondary)",
                   border: "1px solid var(--border-glass)"
                 }}

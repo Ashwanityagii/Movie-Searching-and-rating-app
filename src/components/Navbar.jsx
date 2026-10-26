@@ -1,5 +1,8 @@
 import React from "react";
-import { Film, Bookmark, Star, Flame, Settings, Menu, X, Clapperboard } from "lucide-react";
+import { Film, Bookmark, Star, Flame, Settings, Menu, X, Clapperboard, Sun, Moon } from "lucide-react";
+import HeaderAuth from "./HeaderAuth";
+import CinemaLogo from "./CinemaLogo";
+import brandingImg from "../assets/branding.png";
 
 function VoltageNavButton({ item, isActive, onClick }) {
   const Icon = item.icon;
@@ -17,45 +20,6 @@ function VoltageNavButton({ item, isActive, onClick }) {
           )}
         </div>
       </button>
-
-      {/* Voltage Animated SVG Border Sparks */}
-      <svg
-        version="1.1"
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 234.6 61.3"
-        preserveAspectRatio="none"
-      >
-        <filter id={`glow-${item.id}`}>
-          <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-          <feMerge>
-            <feMergeNode in="coloredBlur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-        <path
-          className="line-1"
-          d="m216.3 5.2c-0.1-0.1-0.2-0.2-0.4-0.2h-197.3c-10 0-18.2 8.1-18.2 18.2v15c0 10 8.2 18.2 18.2 18.2h197.3c10 0 18.2-8.1 18.2-18.2v-15c0-10-8.2-18.2-18.2-18.2z"
-          fill="none"
-          strokeWidth="3.5"
-          style={{ filter: `url(#glow-${item.id})` }}
-        />
-        <path
-          className="line-2"
-          d="m216.3 5.2c-0.1-0.1-0.2-0.2-0.4-0.2h-197.3c-10 0-18.2 8.1-18.2 18.2v15c0 10 8.2 18.2 18.2 18.2h197.3c10 0 18.2-8.1 18.2-18.2v-15c0-10-8.2-18.2-18.2-18.2z"
-          fill="none"
-          strokeWidth="3.5"
-          style={{ filter: `url(#glow-${item.id})` }}
-        />
-      </svg>
-
-      {/* Floating Spark Dots */}
-      <div className="dots">
-        <div className="dot dot-1" />
-        <div className="dot dot-2" />
-        <div className="dot dot-3" />
-        <div className="dot dot-4" />
-        <div className="dot dot-5" />
-      </div>
     </div>
   );
 }
@@ -68,6 +32,18 @@ export default function Navbar({
   onOpenSettings
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const [theme, setTheme] = React.useState(() => {
+    return localStorage.getItem("cinemasathi_theme") || "dark";
+  });
+
+  React.useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("cinemasathi_theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  };
 
   const navItems = [
     { id: "explore", label: "Explore", icon: Film },
@@ -75,7 +51,7 @@ export default function Navbar({
     { id: "topRated", label: "Top Rated", icon: Star },
     {
       id: "watchlist",
-      label: "Watchlist",
+      label: "Watch Later",
       icon: Bookmark,
       badge: watchlistCount > 0 ? watchlistCount : null
     },
@@ -109,60 +85,33 @@ export default function Navbar({
           height: "76px"
         }}
       >
-        {/* Brand Logo */}
+        {/* Brand Logo & Title Lockup */}
         <div
           onClick={() => {
             setActiveTab("explore");
             window.scrollTo({ top: 0, behavior: "smooth" });
           }}
+          className="brand-lockup"
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "0.75rem",
+            gap: "0.85rem",
             cursor: "pointer",
             userSelect: "none"
           }}
         >
-          <div
+          <CinemaLogo size={46} />
+          <img
+            src={brandingImg}
+            alt="Cinema साथी"
+            className="brand-title-img"
             style={{
-              width: "42px",
               height: "42px",
-              borderRadius: "12px",
-              background: "linear-gradient(135deg, #e11d48, #f59e0b)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 4px 15px rgba(225, 29, 72, 0.4)"
+              width: "auto",
+              objectFit: "contain",
+              display: "block"
             }}
-          >
-            <Film size={22} color="#ffffff" strokeWidth={2.2} />
-          </div>
-          <div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-              <span
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontWeight: 800,
-                  fontSize: "1.45rem",
-                  letterSpacing: "-0.03em",
-                  color: "#ffffff"
-                }}
-              >
-                Cinema<span style={{ color: "var(--accent-gold)" }}>Sathi</span>
-              </span>
-            </div>
-            <div
-              style={{
-                fontSize: "0.65rem",
-                letterSpacing: "0.1em",
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                marginTop: "-2px"
-              }}
-            >
-              सिनेमा साथी &bull; Movie Companion
-            </div>
-          </div>
+          />
         </div>
 
         {/* Desktop Navigation with Uiverse.io Voltage Buttons */}
@@ -179,15 +128,46 @@ export default function Navbar({
               key={item.id}
               item={item}
               isActive={activeTab === item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                setActiveTab(item.id);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
             />
           ))}
         </nav>
 
         {/* Right Actions */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          {/* API Voltage Button */}
-          <div className="voltage-button">
+          {/* Clerk Authentication */}
+          <HeaderAuth />
+
+          {/* Light / Dark Theme Switch Button */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            id="theme-switch-btn"
+            aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            className="btn-icon"
+            style={{
+              width: "40px",
+              height: "40px",
+              borderRadius: "12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer"
+            }}
+          >
+            {theme === "dark" ? (
+              <Sun size={19} color="#fbbf24" />
+            ) : (
+              <Moon size={19} color="#6366f1" />
+            )}
+          </button>
+
+          {/* API Voltage Button (hidden) */}
+          <div className="voltage-button" style={{ display: "none" }}>
             <button
               onClick={onOpenSettings}
               title="Configure Movie Database API"
@@ -202,39 +182,6 @@ export default function Navbar({
               <Settings size={15} color="#6bfeff" />
               <span>API</span>
             </button>
-            <svg
-              version="1.1"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 234.6 61.3"
-              preserveAspectRatio="none"
-            >
-              <filter id="glow-api">
-                <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-                <feMerge>
-                  <feMergeNode in="coloredBlur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-              <path
-                className="line-1"
-                d="m216.3 5.2c-0.1-0.1-0.2-0.2-0.4-0.2h-197.3c-10 0-18.2 8.1-18.2 18.2v15c0 10 8.2 18.2 18.2 18.2h197.3c10 0 18.2-8.1 18.2-18.2v-15c0-10-8.2-18.2-18.2-18.2z"
-                fill="none"
-                strokeWidth="3.5"
-                style={{ filter: "url(#glow-api)" }}
-              />
-              <path
-                className="line-2"
-                d="m216.3 5.2c-0.1-0.1-0.2-0.2-0.4-0.2h-197.3c-10 0-18.2 8.1-18.2 18.2v15c0 10 8.2 18.2 18.2 18.2h197.3c10 0 18.2-8.1 18.2-18.2v-15c0-10-8.2-18.2-18.2-18.2z"
-                fill="none"
-                strokeWidth="3.5"
-                style={{ filter: "url(#glow-api)" }}
-              />
-            </svg>
-            <div className="dots">
-              <div className="dot dot-1" />
-              <div className="dot dot-2" />
-              <div className="dot dot-3" />
-            </div>
           </div>
 
           {/* Mobile hamburger */}
@@ -273,6 +220,7 @@ export default function Navbar({
                   onClick={() => {
                     setActiveTab(item.id);
                     setMobileMenuOpen(false);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
                   style={{
                     width: "100%",
@@ -295,6 +243,11 @@ export default function Navbar({
               </div>
             );
           })}
+
+          {/* Mobile Auth Action */}
+          <div style={{ paddingTop: "0.5rem", borderTop: "1px solid var(--border-glass)", display: "flex", justifyContent: "center" }}>
+            <HeaderAuth />
+          </div>
         </div>
       )}
 

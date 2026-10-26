@@ -104,17 +104,37 @@ export const getStoredWatchlist = () => {
   }
 };
 
-export const toggleWatchlist = (imdbID) => {
+export const getStoredWatchlistMovies = () => {
   try {
+    const data = localStorage.getItem("cinemasathi_watchlist_movies");
+    return data ? JSON.parse(data) : {};
+  } catch (e) {
+    return {};
+  }
+};
+
+export const toggleWatchlist = (movieOrId) => {
+  try {
+    const imdbID = typeof movieOrId === "string" ? movieOrId : movieOrId?.imdbID;
+    if (!imdbID) return getStoredWatchlist();
+
     const watchlist = getStoredWatchlist();
+    const storedMovies = getStoredWatchlistMovies();
     const index = watchlist.indexOf(imdbID);
     let updated;
+
     if (index > -1) {
       updated = watchlist.filter((id) => id !== imdbID);
+      delete storedMovies[imdbID];
     } else {
       updated = [imdbID, ...watchlist];
+      if (typeof movieOrId === "object" && movieOrId !== null) {
+        storedMovies[imdbID] = movieOrId;
+      }
     }
+
     localStorage.setItem(STORAGE_KEYS.WATCHLIST, JSON.stringify(updated));
+    localStorage.setItem("cinemasathi_watchlist_movies", JSON.stringify(storedMovies));
     return updated;
   } catch (e) {
     console.error("Failed to toggle watchlist", e);

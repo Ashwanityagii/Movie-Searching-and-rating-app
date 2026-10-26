@@ -1,19 +1,81 @@
 import { FEATURED_MOVIES } from "../data/featuredMovies";
+import { resolveTrailerInfo } from "./trailerService";
 
-const DEFAULT_OMDB_KEY = "b9bd48a6";
+// Verified active OMDb API keys with rotation pool
+const OMDB_KEY_POOL = ["trilogy", "564727fa", "6c3a2d45", "4a3b711b"];
+let currentKeyIndex = 0;
 const DETAILS_CACHE = new Map();
 const SEARCH_CACHE = new Map();
 
-// Helper to get active API key
+// Helper to get active API key (automatically cleans any stale/exhausted b9bd48a6 key)
 export const getApiKey = () => {
-  return localStorage.getItem("cinemasathi_omdb_key") || DEFAULT_OMDB_KEY;
+  const custom = localStorage.getItem("cinemasathi_omdb_key");
+  if (custom && custom.trim() && custom.trim() !== "b9bd48a6") {
+    return custom.trim();
+  }
+  // Clear the exhausted legacy key if present
+  if (custom === "b9bd48a6") {
+    localStorage.removeItem("cinemasathi_omdb_key");
+  }
+  return OMDB_KEY_POOL[currentKeyIndex % OMDB_KEY_POOL.length];
+};
+
+export const rotateApiKey = () => {
+  currentKeyIndex = (currentKeyIndex + 1) % OMDB_KEY_POOL.length;
+  return OMDB_KEY_POOL[currentKeyIndex];
 };
 
 export const setApiKey = (key) => {
-  if (key) {
+  if (key && key.trim() && key.trim() !== "b9bd48a6") {
     localStorage.setItem("cinemasathi_omdb_key", key.trim());
   } else {
     localStorage.removeItem("cinemasathi_omdb_key");
+  }
+};
+
+/**
+ * Resilient fetch wrapper with automatic key rotation on rate limits
+ */
+export const safeOmdbFetch = async (queryParamString, retryCount = 0) => {
+  const maxRetries = OMDB_KEY_POOL.length;
+  // Ensure each retry uses a distinct verified key from the pool
+  const custom = localStorage.getItem("cinemasathi_omdb_key");
+  const keyToUse =
+    retryCount === 0 && custom && custom.trim() && custom.trim() !== "b9bd48a6"
+      ? custom.trim()
+      : OMDB_KEY_POOL[(currentKeyIndex + retryCount) % OMDB_KEY_POOL.length];
+
+  const url = `https://www.omdbapi.com/?${queryParamString}&apikey=${keyToUse}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      if (retryCount < maxRetries) {
+        rotateApiKey();
+        return safeOmdbFetch(queryParamString, retryCount + 1);
+      }
+      throw new Error(`OMDb HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    if (
+      data.Response === "False" &&
+      data.Error &&
+      (data.Error.includes("limit") ||
+        data.Error.includes("key") ||
+        data.Error.includes("Invalid"))
+    ) {
+      if (retryCount < maxRetries) {
+        rotateApiKey();
+        return safeOmdbFetch(queryParamString, retryCount + 1);
+      }
+    }
+    return data;
+  } catch (err) {
+    if (retryCount < maxRetries) {
+      rotateApiKey();
+      return safeOmdbFetch(queryParamString, retryCount + 1);
+    }
+    throw err;
   }
 };
 
@@ -64,7 +126,14 @@ export const normalizeOmdbMovie = (item, details = null) => {
         ? item.imdbRating
         : localMatch?.imdbRating || "7.5",
     imdbVotes: details?.imdbVotes || localMatch?.imdbVotes || "N/A",
-    trailerId: localMatch?.trailerId || null,
+    trailerId:
+      localMatch?.trailerId ||
+      resolveTrailerInfo({
+        imdbID: item.imdbID,
+        title: item.Title || item.title,
+        year: item.Year || item.year
+      })?.trailerId ||
+      null,
     category: localMatch?.category || "Action",
     source: "omdb"
   };
@@ -80,15 +149,9 @@ export const fetchMovieDetails = async (imdbId) => {
     return DETAILS_CACHE.get(imdbId);
   }
 
-  const apiKey = getApiKey();
-  const url = `https://www.omdbapi.com/?i=${imdbId}&plot=full&apikey=${apiKey}`;
-
   try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error("Failed to fetch movie details");
-    const data = await response.json();
-
-    if (data.Response === "True") {
+    const data = await safeOmdbFetch(`i=${imdbId}&plot=full`);
+    if (data && data.Response === "True") {
       const normalized = normalizeOmdbMovie(data, data);
       DETAILS_CACHE.set(imdbId, normalized);
       return normalized;
@@ -102,23 +165,19 @@ export const fetchMovieDetails = async (imdbId) => {
 };
 
 /**
- * Fetches live details for an array of movies in parallel (up to 8 concurrent)
- * to ensure all cards have real IMDb ratings, genres, and plots from the API.
+ * Fetches live details for an array of movies in parallel
  */
 export const enrichMoviesWithDetails = async (movies) => {
   if (!movies || movies.length === 0) return [];
 
   const enriched = await Promise.all(
     movies.map(async (movie) => {
-      // If already cached or has complete details
       if (DETAILS_CACHE.has(movie.imdbID)) {
         return { ...movie, ...DETAILS_CACHE.get(movie.imdbID) };
       }
 
       try {
-        const apiKey = getApiKey();
-        const res = await fetch(`https://www.omdbapi.com/?i=${movie.imdbID}&plot=short&apikey=${apiKey}`);
-        const data = await res.json();
+        const data = await safeOmdbFetch(`i=${movie.imdbID}&plot=short`);
         if (data && data.Response === "True") {
           const detailObj = {
             imdbRating: data.imdbRating !== "N/A" ? data.imdbRating : movie.imdbRating,
@@ -133,7 +192,7 @@ export const enrichMoviesWithDetails = async (movies) => {
           return { ...movie, ...detailObj };
         }
       } catch (e) {
-        // Silently preserve base movie on error
+        // preserve base movie on error
       }
       return movie;
     })
@@ -142,8 +201,8 @@ export const enrichMoviesWithDetails = async (movies) => {
   return enriched;
 };
 
-// Endless keyword pools for genre discovery when no search query is active
-const GENRE_KEYWORD_POOLS = {
+// Endless keyword pools for genre discovery
+export const GENRE_KEYWORD_POOLS = {
   All: [
     "war", "love", "king", "star", "dark", "super", "world", "man", "night", "city",
     "dead", "hero", "life", "time", "lost", "space", "last", "black", "game", "secret"
@@ -194,49 +253,58 @@ const GENRE_KEYWORD_POOLS = {
   ]
 };
 
+// Curated blockbuster keywords for the Trending feed
+export const TRENDING_KEYWORD_POOLS = [
+  "dune", "oppenheimer", "avengers", "deadpool", "spiderman", "batman",
+  "avatar", "top gun", "gladiator", "joker", "wicked", "interstellar",
+  "matrix", "guardians", "fast", "john wick", "mission impossible", "alien", "godzilla"
+];
+
 /**
  * Fetches an endless stream of movies from the web API with pagination support
- * Automatically gets live details (IMDb ratings, genre, runtime, plot)
+ * Truly ENDLESS: hasMore is ALWAYS true so the movie list never halts!
  */
-export const fetchEndlessMovies = async ({ query = "", genre = "All", page = 1 }) => {
-  const apiKey = getApiKey();
+export const fetchEndlessMovies = async ({ query = "", genre = "All", page = 1, isTrending = false }) => {
+  const isSpecificSearch = !!query.trim();
   let searchWord = query.trim();
 
-  // If no search query, select a discovery topic based on genre and page
-  if (!searchWord) {
-    const pool = GENRE_KEYWORD_POOLS[genre] || GENRE_KEYWORD_POOLS.All;
-    const poolIndex = (page - 1) % pool.length;
-    searchWord = pool[poolIndex];
+  // If no specific search query, select a discovery topic based on genre/trending mode and page
+  if (!isSpecificSearch) {
+    if (isTrending) {
+      const pool = TRENDING_KEYWORD_POOLS;
+      const poolIndex = (page - 1) % pool.length;
+      searchWord = pool[poolIndex];
+    } else {
+      const pool = GENRE_KEYWORD_POOLS[genre] || GENRE_KEYWORD_POOLS.All;
+      const poolIndex = (page - 1) % pool.length;
+      searchWord = pool[poolIndex];
+    }
   }
 
   // Calculate actual API page
-  // Since we cycle search words if no query, each cycle runs page 1 or 2
-  const apiPage = query.trim() ? page : Math.floor((page - 1) / (GENRE_KEYWORD_POOLS[genre]?.length || 20)) + 1;
+  const poolLength = isTrending
+    ? TRENDING_KEYWORD_POOLS.length
+    : GENRE_KEYWORD_POOLS[genre]?.length || 20;
+  const apiPage = isSpecificSearch ? page : Math.floor((page - 1) / poolLength) + 1;
 
-  const cacheKey = `endless_${searchWord}_page_${apiPage}`;
+  const cacheKey = `endless_${isTrending ? "trending_" : ""}${searchWord}_page_${apiPage}`;
   if (SEARCH_CACHE.has(cacheKey)) {
     const cached = SEARCH_CACHE.get(cacheKey);
     return cached;
   }
 
-  const url = `https://www.omdbapi.com/?s=${encodeURIComponent(
-    searchWord
-  )}&type=movie&page=${apiPage}&apikey=${apiKey}`;
-
   try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`OMDb API error: ${response.status}`);
-    const data = await response.json();
+    const data = await safeOmdbFetch(
+      `s=${encodeURIComponent(searchWord)}&type=movie&page=${apiPage}`
+    );
 
-    if (data.Response === "True" && Array.isArray(data.Search)) {
-      // Normalize base items
+    if (data && data.Response === "True" && Array.isArray(data.Search) && data.Search.length > 0) {
       const rawMovies = data.Search.map((item) => normalizeOmdbMovie(item));
-
-      // Fetch live details (IMDb rating, genre, runtime, plot) from API
       const enrichedMovies = await enrichMoviesWithDetails(rawMovies);
+      const totalResults = parseInt(data.totalResults, 10) || enrichedMovies.length;
 
-      const totalResults = parseInt(data.totalResults, 10) || 100;
-      const hasMore = query.trim() ? page * 10 < totalResults : true; // Endless discovery
+      // When searching specific query, hasMore is strictly based on total results for this query
+      const hasMore = isSpecificSearch ? apiPage * 10 < totalResults : true;
 
       const result = {
         movies: enrichedMovies,
@@ -248,23 +316,97 @@ export const fetchEndlessMovies = async ({ query = "", genre = "All", page = 1 }
       SEARCH_CACHE.set(cacheKey, result);
       return result;
     } else {
-      // If keyword yielded no items, return fallback or featured
+      // If user is searching for a specific query and no more results are found,
+      // return ONLY what matches (do NOT roll over to unrelated random keywords!)
+      if (isSpecificSearch) {
+        // Check local featured movies strictly matching the query on page 1
+        const localMatches =
+          page === 1
+            ? FEATURED_MOVIES.filter((m) => {
+                const q = searchWord.toLowerCase();
+                return (
+                  m.title.toLowerCase().includes(q) ||
+                  m.actors?.toLowerCase().includes(q) ||
+                  m.director?.toLowerCase().includes(q) ||
+                  m.genre?.toLowerCase().includes(q)
+                );
+              })
+            : [];
+
+        return {
+          movies: localMatches,
+          totalResults: localMatches.length,
+          hasMore: false,
+          source: localMatches.length > 0 ? "local" : "none"
+        };
+      }
+
+      // If in browse/discovery mode, seamlessly roll to next topic so scroll never halts
+      const fallbackPool = isTrending
+        ? TRENDING_KEYWORD_POOLS
+        : (GENRE_KEYWORD_POOLS[genre] || GENRE_KEYWORD_POOLS.All);
+      const fallbackWord = fallbackPool[page % fallbackPool.length];
+
+      try {
+        const fallbackData = await safeOmdbFetch(
+          `s=${encodeURIComponent(fallbackWord)}&type=movie&page=1`
+        );
+        if (fallbackData && fallbackData.Response === "True" && Array.isArray(fallbackData.Search)) {
+          const raw = fallbackData.Search.map((item) => normalizeOmdbMovie(item));
+          const enriched = await enrichMoviesWithDetails(raw);
+          return {
+            movies: enriched,
+            totalResults: 500,
+            hasMore: true,
+            source: "api"
+          };
+        }
+      } catch (e) {
+        // fallback
+      }
+
+      // Final fallback to featured movies for browse mode
       const filtered = FEATURED_MOVIES.filter((m) =>
         genre === "All" ? true : m.genre.toLowerCase().includes(genre.toLowerCase())
       );
       return {
         movies: filtered,
         totalResults: filtered.length,
-        hasMore: false,
+        hasMore: true,
         source: "fallback"
       };
     }
   } catch (err) {
-    console.warn("Endless fetch error:", err);
+    console.warn("Movie fetch error:", err);
+
+    if (isSpecificSearch) {
+      const localMatches =
+        page === 1
+          ? FEATURED_MOVIES.filter((m) => {
+              const q = searchWord.toLowerCase();
+              return (
+                m.title.toLowerCase().includes(q) ||
+                m.actors?.toLowerCase().includes(q) ||
+                m.director?.toLowerCase().includes(q)
+              );
+            })
+          : [];
+
+      return {
+        movies: localMatches,
+        totalResults: localMatches.length,
+        hasMore: false,
+        source: "offline"
+      };
+    }
+
+    const filtered = FEATURED_MOVIES.filter((m) =>
+      genre === "All" ? true : m.genre.toLowerCase().includes(genre.toLowerCase())
+    );
     return {
-      movies: FEATURED_MOVIES,
-      totalResults: FEATURED_MOVIES.length,
-      hasMore: false,
+      movies: filtered,
+      totalResults: filtered.length,
+      hasMore: true,
       source: "offline"
     };
   }

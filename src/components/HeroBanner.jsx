@@ -122,7 +122,8 @@ export default function HeroBanner({
               lineHeight: 1.08,
               letterSpacing: "-0.03em",
               marginBottom: "1rem",
-              textShadow: "0 4px 20px rgba(0,0,0,0.8)"
+              color: "#ffffff",
+              textShadow: "0 4px 24px rgba(0, 0, 0, 0.95), 0 2px 8px rgba(0, 0, 0, 0.9)"
             }}
           >
             {currentMovie.title}
@@ -147,12 +148,39 @@ export default function HeroBanner({
               <span>IMDb {currentMovie.imdbRating || "8.5"}</span>
             </div>
 
-            <span className="badge badge-dark">{currentMovie.year}</span>
+            <span
+              className="badge"
+              style={{
+                background: "rgba(0, 0, 0, 0.65)",
+                color: "#ffffff",
+                border: "1px solid rgba(255, 255, 255, 0.25)"
+              }}
+            >
+              {currentMovie.year}
+            </span>
             {currentMovie.rated && (
-              <span className="badge badge-dark">{currentMovie.rated}</span>
+              <span
+                className="badge"
+                style={{
+                  background: "rgba(0, 0, 0, 0.65)",
+                  color: "#ffffff",
+                  border: "1px solid rgba(255, 255, 255, 0.25)"
+                }}
+              >
+                {currentMovie.rated}
+              </span>
             )}
             {currentMovie.runtime && (
-              <span className="badge badge-dark">{currentMovie.runtime}</span>
+              <span
+                className="badge"
+                style={{
+                  background: "rgba(0, 0, 0, 0.65)",
+                  color: "#ffffff",
+                  border: "1px solid rgba(255, 255, 255, 0.25)"
+                }}
+              >
+                {currentMovie.runtime}
+              </span>
             )}
 
             {currentMovie.genre &&
@@ -171,13 +199,13 @@ export default function HeroBanner({
             style={{
               fontSize: "1.05rem",
               lineHeight: 1.65,
-              color: "rgba(241, 245, 249, 0.85)",
+              color: "rgba(255, 255, 255, 0.95)",
               marginBottom: "2rem",
               display: "-webkit-box",
               WebkitLineClamp: 3,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
-              textShadow: "0 2px 10px rgba(0,0,0,0.6)"
+              textShadow: "0 2px 12px rgba(0, 0, 0, 0.85)"
             }}
           >
             {currentMovie.plot}
@@ -211,13 +239,14 @@ export default function HeroBanner({
             </button>
 
             <button
-              onClick={() => onToggleWatchlist(currentMovie.imdbID)}
-              aria-label="Add to Watchlist"
+              onClick={() => onToggleWatchlist(currentMovie)}
+              aria-label="Add to Watch Later"
               className="btn btn-secondary"
               style={{
                 padding: "0.8rem 1.25rem",
                 color: inWatchlist ? "var(--accent-cyan)" : "var(--text-primary)",
-                borderColor: inWatchlist ? "var(--accent-cyan)" : "var(--border-glass)"
+                borderColor: inWatchlist ? "var(--accent-cyan)" : "var(--border-glass)",
+                background: inWatchlist ? "rgba(6, 182, 212, 0.15)" : undefined
               }}
             >
               <Bookmark
@@ -225,7 +254,7 @@ export default function HeroBanner({
                 fill={inWatchlist ? "var(--accent-cyan)" : "none"}
                 color={inWatchlist ? "var(--accent-cyan)" : "currentColor"}
               />
-              <span>{inWatchlist ? "In Watchlist" : "Watchlist"}</span>
+              <span>{inWatchlist ? "In Watch Later" : "Watch Later"}</span>
             </button>
           </div>
         </div>

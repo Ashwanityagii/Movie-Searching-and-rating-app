@@ -7,13 +7,11 @@ import {
   Heart,
   Calendar,
   Clock,
-  Award,
-  Users,
-  Film,
   Send,
   MessageSquare,
   AlertTriangle,
-  Sparkles
+  Sparkles,
+  Loader2
 } from "lucide-react";
 import StarRating from "./StarRating";
 import { fetchMovieDetails } from "../services/movieApi";
@@ -31,7 +29,7 @@ export default function MovieModal({
   onWatchTrailer,
   onAddReview
 }) {
-  const [fullMovie, setFullMovie] = useState(movie);
+  const [movieDetails, setMovieDetails] = useState(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
   // Review form state
@@ -43,23 +41,25 @@ export default function MovieModal({
   const [showSpoilerReviews, setShowSpoilerReviews] = useState({});
 
   useEffect(() => {
-    if (!movie) return;
-    setFullMovie(movie);
+    if (!movie?.imdbID) return;
 
     // If plot or actors is missing or standard short summary, fetch live full details
-    if (movie.imdbID && (!movie.actors || movie.actors === "N/A" || !movie.director)) {
+    if (!movie.actors || movie.actors === "N/A" || !movie.director) {
       setIsLoadingDetails(true);
       fetchMovieDetails(movie.imdbID)
         .then((details) => {
           if (details) {
-            setFullMovie((prev) => ({ ...prev, ...details }));
+            setMovieDetails(details);
           }
         })
+        .catch(() => {})
         .finally(() => {
           setIsLoadingDetails(false);
         });
     }
-  }, [movie]);
+  }, [movie?.imdbID, movie?.actors, movie?.director]);
+
+  const fullMovie = movie ? { ...movie, ...movieDetails } : null;
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -181,26 +181,31 @@ export default function MovieModal({
             <X size={20} />
           </button>
 
-          {/* Trailer quick button inside backdrop */}
-          <div
+          {/* Centered backdrop play preview trigger */}
+          <button
+            type="button"
+            id="modal-backdrop-play-btn"
+            onClick={() => onWatchTrailer(fullMovie || movie)}
+            aria-label="Play trailer"
+            className="btn btn-crimson"
             style={{
               position: "absolute",
-              bottom: "1.25rem",
-              right: "1.5rem",
+              top: "45%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              zIndex: 10,
+              padding: "0.75rem 1.4rem",
+              borderRadius: "var(--radius-full)",
+              boxShadow: "0 8px 30px rgba(0, 0, 0, 0.7)",
+              fontWeight: 700,
               display: "flex",
-              gap: "0.75rem",
-              zIndex: 10
+              alignItems: "center",
+              gap: "0.55rem"
             }}
           >
-            <button
-              onClick={() => onWatchTrailer(fullMovie)}
-              className="btn btn-crimson"
-              style={{ padding: "0.65rem 1.25rem" }}
-            >
-              <Play size={16} fill="#ffffff" />
-              Watch Trailer
-            </button>
-          </div>
+            <Play size={18} fill="#ffffff" />
+            <span>Play Trailer</span>
+          </button>
         </div>
 
         {/* Modal Main Body */}
@@ -245,16 +250,26 @@ export default function MovieModal({
             <div style={{ flexGrow: 1, paddingTop: "1rem" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: "0.75rem", flexWrap: "wrap" }}>
                 <h2
+                  className="modal-movie-title"
                   style={{
                     fontSize: "2.1rem",
                     fontWeight: 800,
                     margin: 0,
-                    lineHeight: 1.2
+                    lineHeight: 1.2,
+                    color: "#ffffff",
+                    textShadow: "0 2px 16px rgba(0, 0, 0, 0.95), 0 1px 4px rgba(0, 0, 0, 0.9)"
                   }}
                 >
                   {fullMovie.title}
                 </h2>
-                <span style={{ fontSize: "1.2rem", color: "var(--text-muted)" }}>
+                <span
+                  className="modal-movie-year"
+                  style={{
+                    fontSize: "1.2rem",
+                    color: "rgba(255, 255, 255, 0.85)",
+                    textShadow: "0 1px 6px rgba(0, 0, 0, 0.9)"
+                  }}
+                >
                   ({fullMovie.year})
                 </span>
               </div>
@@ -311,14 +326,32 @@ export default function MovieModal({
               </div>
 
               {/* Action toggles */}
-              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
                 <button
                   type="button"
-                  onClick={() => onToggleWatchlist(fullMovie.imdbID)}
+                  id="modal-watch-trailer-btn"
+                  onClick={() => onWatchTrailer(fullMovie || movie)}
+                  className="btn btn-crimson"
+                  style={{
+                    padding: "0.6rem 1.3rem",
+                    fontWeight: 600,
+                    boxShadow: "0 4px 14px rgba(225, 29, 72, 0.3)"
+                  }}
+                >
+                  <Play size={16} fill="#ffffff" />
+                  <span>Watch Trailer</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="modal-watch-later-btn"
+                  onClick={() => onToggleWatchlist(fullMovie || movie)}
                   className="btn btn-secondary"
                   style={{
                     color: inWatchlist ? "var(--accent-cyan)" : "var(--text-primary)",
-                    borderColor: inWatchlist ? "var(--accent-cyan)" : "var(--border-glass)"
+                    borderColor: inWatchlist ? "var(--accent-cyan)" : "var(--border-glass)",
+                    background: inWatchlist ? "rgba(6, 182, 212, 0.15)" : undefined,
+                    fontWeight: 600
                   }}
                 >
                   <Bookmark
@@ -326,7 +359,7 @@ export default function MovieModal({
                     fill={inWatchlist ? "var(--accent-cyan)" : "none"}
                     color={inWatchlist ? "var(--accent-cyan)" : "currentColor"}
                   />
-                  <span>{inWatchlist ? "Saved in Watchlist" : "Add to Watchlist"}</span>
+                  <span>{inWatchlist ? "In Watch Later" : "Watch Later"}</span>
                 </button>
 
                 <button
@@ -391,7 +424,23 @@ export default function MovieModal({
 
           {/* Overview / Synopsis */}
           <div style={{ marginBottom: "2rem" }}>
-            <h3 style={{ fontSize: "1.25rem", marginBottom: "0.75rem" }}>Synopsis</h3>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.75rem" }}>
+              <h3 style={{ fontSize: "1.25rem", margin: 0 }}>Synopsis</h3>
+              {isLoadingDetails && (
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "var(--accent-cyan)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.3rem"
+                  }}
+                >
+                  <Loader2 size={12} className="spin" />
+                  Loading details...
+                </span>
+              )}
+            </div>
             <p style={{ fontSize: "1rem", lineHeight: 1.7, color: "var(--text-primary)" }}>
               {fullMovie.plot}
             </p>

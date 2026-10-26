@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, X, SlidersHorizontal, Star, Globe, Sparkles } from "lucide-react";
+import { Search, X, SlidersHorizontal, Star, Globe, Sparkles, Flame } from "lucide-react";
 import { GENRES } from "../data/featuredMovies";
 
 export default function FilterBar({
@@ -13,7 +13,8 @@ export default function FilterBar({
   setMinRating,
   onResetFilters,
   isLiveApiSearching,
-  source
+  source,
+  activeTab
 }) {
   return (
     <div
@@ -65,7 +66,7 @@ export default function FilterBar({
             style={{
               width: "100%",
               padding: "0.8rem 2.75rem 0.8rem 2.85rem",
-              background: "rgba(10, 13, 20, 0.7)",
+              background: "var(--bg-secondary)",
               border: "1px solid var(--border-glass)",
               borderRadius: "var(--radius-md)",
               fontSize: "0.95rem",
@@ -124,15 +125,31 @@ export default function FilterBar({
             gap: "0.75rem"
           }}
         >
-          {/* Live API Tag indicator */}
+          {/* Live API Tag indicator (hidden per user request) */}
           <div
             className="badge badge-emerald"
             title="Live Web Movie Database connection active"
-            style={{ padding: "0.45rem 0.75rem", fontSize: "0.78rem" }}
+            style={{ display: "none" }}
           >
             <Globe size={13} />
             <span>Web API Connected</span>
           </div>
+
+          {activeTab === "trending" && (
+            <div
+              className="badge badge-crimson"
+              style={{
+                padding: "0.45rem 0.75rem",
+                fontSize: "0.78rem",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px"
+              }}
+            >
+              <Flame size={13} fill="#e11d48" />
+              <span>Trending Blockbusters</span>
+            </div>
+          )}
 
           {/* Sort selector */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
@@ -142,7 +159,7 @@ export default function FilterBar({
               onChange={(e) => setSortBy(e.target.value)}
               style={{
                 padding: "0.55rem 0.85rem",
-                background: "rgba(10, 13, 20, 0.7)",
+                background: "var(--bg-secondary)",
                 border: "1px solid var(--border-glass)",
                 borderRadius: "var(--radius-sm)",
                 color: "var(--text-primary)",
@@ -150,6 +167,7 @@ export default function FilterBar({
                 cursor: "pointer"
               }}
             >
+              <option value="popular_desc">Most Popular (Trending)</option>
               <option value="rating_desc">Highest Rated (Top)</option>
               <option value="rating_asc">Lowest Rated</option>
               <option value="year_desc">Newest Releases</option>
@@ -166,7 +184,7 @@ export default function FilterBar({
               onChange={(e) => setMinRating(Number(e.target.value))}
               style={{
                 padding: "0.55rem 0.85rem",
-                background: "rgba(10, 13, 20, 0.7)",
+                background: "var(--bg-secondary)",
                 border: "1px solid var(--border-glass)",
                 borderRadius: "var(--radius-sm)",
                 color: "var(--text-primary)",
@@ -222,7 +240,7 @@ export default function FilterBar({
                 fontWeight: 600,
                 background: isSelected
                   ? "linear-gradient(135deg, #f59e0b, #d97706)"
-                  : "rgba(255, 255, 255, 0.05)",
+                  : "var(--bg-secondary)",
                 color: isSelected ? "#000" : "var(--text-secondary)",
                 border: isSelected
                   ? "1px solid rgba(245, 158, 11, 0.5)"

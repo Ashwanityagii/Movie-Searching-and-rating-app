@@ -6,8 +6,11 @@ import MovieCard from "./components/MovieCard";
 import MovieModal from "./components/MovieModal";
 import TrailerModal from "./components/TrailerModal";
 import SettingsModal from "./components/SettingsModal";
+import LoginModal from "./components/LoginModal";
 import WatchlistView from "./components/WatchlistView";
 import Toast from "./components/Toast";
+import CinemaLogo from "./components/CinemaLogo";
+import brandingImg from "./assets/branding.png";
 import { FEATURED_MOVIES } from "./data/featuredMovies";
 import { fetchEndlessMovies } from "./services/movieApi";
 import {
@@ -16,11 +19,12 @@ import {
   getStoredReviews,
   addReview,
   getStoredWatchlist,
+  getStoredWatchlistMovies,
   toggleWatchlist,
   getStoredFavorites,
   toggleFavorite
 } from "./services/storage";
-import { Film, Sparkles, RefreshCw, Loader2, ArrowDown, Check } from "lucide-react";
+import { Film, Sparkles, RefreshCw, Loader2, ArrowDown, Flame } from "lucide-react";
 
 export default function App() {
   // Navigation & View Tabs
@@ -58,26 +62,42 @@ export default function App() {
   const debounceTimerRef = useRef(null);
   const sentinelRef = useRef(null);
 
+  // State refs to prevent closure staleness during rapid endless scrolling
+  const isLoadingMoreRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const isLoadingInitialRef = useRef(false);
+  const pageRef = useRef(1);
+
+  useEffect(() => {
+    isLoadingMoreRef.current = isLoadingMore;
+    hasMoreRef.current = hasMore;
+    isLoadingInitialRef.current = isLoadingInitial;
+    pageRef.current = page;
+  }, [isLoadingMore, hasMore, isLoadingInitial, page]);
+
   const showToast = (message, type = "success") => {
     setToast({ message, type });
   };
 
   /**
-   * Loads movies for a given page, query, and genre
+   * Loads movies for a given page, query, genre, and tab
    */
   const loadMovies = useCallback(
-    async (pageNum, query, genre, isNewSearch = false) => {
+    async (pageNum, query, genre, isNewSearch = false, tab = activeTab) => {
       if (isNewSearch) {
         setIsLoadingInitial(true);
       } else {
         setIsLoadingMore(true);
       }
 
+      const isTrending = tab === "trending";
+
       try {
         const result = await fetchEndlessMovies({
           query,
           genre,
-          page: pageNum
+          page: pageNum,
+          isTrending
         });
 
         if (result && Array.isArray(result.movies)) {
@@ -85,7 +105,19 @@ export default function App() {
             if (isNewSearch) {
               // Combine with featured if on page 1 with no query
               if (!query.trim() && pageNum === 1 && genre === "All") {
-                const combined = [...FEATURED_MOVIES, ...result.movies];
+                let baseList = [...FEATURED_MOVIES];
+                if (isTrending) {
+                  baseList.sort((a, b) => {
+                    const yearA = parseInt(a.year, 10) || 0;
+                    const yearB = parseInt(b.year, 10) || 0;
+                    const votesA = parseInt((a.imdbVotes || "0").replace(/,/g, ""), 10) || 0;
+                    const votesB = parseInt((b.imdbVotes || "0").replace(/,/g, ""), 10) || 0;
+                    const scoreA = (yearA >= 2018 ? 2000000 : 0) + votesA;
+                    const scoreB = (yearB >= 2018 ? 2000000 : 0) + votesB;
+                    return scoreB - scoreA;
+                  });
+                }
+                const combined = [...baseList, ...result.movies];
                 return combined.filter(
                   (m, idx, arr) => arr.findIndex((x) => x.imdbID === m.imdbID) === idx
                 );
@@ -100,7 +132,9 @@ export default function App() {
             }
           });
 
-          setHasMore(result.hasMore);
+          const moreAvailable = result.hasMore ?? true;
+          setHasMore(moreAvailable);
+          hasMoreRef.current = moreAvailable;
           setApiSource(result.source);
         }
       } catch (err) {
@@ -110,7 +144,7 @@ export default function App() {
         setIsLoadingMore(false);
       }
     },
-    []
+    [activeTab]
   );
 
   // Handle Query & Genre Changes with debounce
@@ -122,6 +156,8 @@ export default function App() {
     debounceTimerRef.current = setTimeout(() => {
       setPage(1);
       setHasMore(true);
+      pageRef.current = 1;
+      hasMoreRef.current = true;
       loadMovies(1, searchQuery, selectedGenre, true);
     }, 450);
 
@@ -132,13 +168,14 @@ export default function App() {
 
   // Load next page of endless movies
   const handleLoadMore = useCallback(() => {
-    if (isLoadingMore || !hasMore || isLoadingInitial) return;
-    const nextPage = page + 1;
+    if (isLoadingMoreRef.current || isLoadingInitialRef.current || !hasMoreRef.current) return;
+    const nextPage = pageRef.current + 1;
+    pageRef.current = nextPage;
     setPage(nextPage);
-    loadMovies(nextPage, searchQuery, selectedGenre, false);
-  }, [isLoadingMore, hasMore, isLoadingInitial, page, searchQuery, selectedGenre, loadMovies]);
+    loadMovies(nextPage, searchQuery, selectedGenre, false, activeTab);
+  }, [searchQuery, selectedGenre, loadMovies, activeTab]);
 
-  // Infinite Scroll IntersectionObserver
+  // Infinite Scroll IntersectionObserver with 800px preloading margin
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
@@ -146,14 +183,18 @@ export default function App() {
     const observer = new IntersectionObserver(
       (entries) => {
         const firstEntry = entries[0];
-        if (firstEntry.isIntersecting && hasMore && !isLoadingMore && !isLoadingInitial) {
+        if (
+          firstEntry.isIntersecting &&
+          !isLoadingMoreRef.current &&
+          !isLoadingInitialRef.current
+        ) {
           handleLoadMore();
         }
       },
       {
         root: null,
-        rootMargin: "300px", // Trigger before reaching absolute bottom
-        threshold: 0.1
+        rootMargin: "800px", // Preload smoothly well before reaching the bottom
+        threshold: 0.05
       }
     );
 
@@ -161,23 +202,64 @@ export default function App() {
     return () => {
       if (sentinel) observer.unobserve(sentinel);
     };
-  }, [handleLoadMore, hasMore, isLoadingMore, isLoadingInitial]);
+  }, [handleLoadMore]);
+
+  // Dual-trigger window scroll listener fallback for continuous endless browsing
+  useEffect(() => {
+    const handleWindowScroll = () => {
+      if (isLoadingMoreRef.current || isLoadingInitialRef.current) return;
+      const scrollPosition = window.innerHeight + window.scrollY;
+      const threshold = document.documentElement.scrollHeight - 800;
+      if (scrollPosition >= threshold) {
+        handleLoadMore();
+      }
+    };
+
+    window.addEventListener("scroll", handleWindowScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleWindowScroll);
+  }, [handleLoadMore]);
 
   // Handle Tab Switch Actions
-  useEffect(() => {
-    if (activeTab === "topRated") {
+  const handleTabChange = useCallback((tabId) => {
+    setActiveTab(tabId);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    pageRef.current = 1;
+    hasMoreRef.current = true;
+    setPage(1);
+    setHasMore(true);
+    setSearchQuery("");
+    setSelectedGenre("All");
+
+    if (tabId === "topRated") {
       setMinRating(8.5);
-      setSelectedGenre("All");
-    } else if (activeTab === "trending") {
-      setMinRating(0);
-      setSelectedGenre("All");
       setSortBy("rating_desc");
+      loadMovies(1, "", "All", true, "topRated");
+    } else if (tabId === "trending") {
+      setMinRating(0);
+      setSortBy("popular_desc");
+      loadMovies(1, "", "All", true, "trending");
+    } else if (tabId === "explore") {
+      setMinRating(0);
+      setSortBy("rating_desc");
+      loadMovies(1, "", "All", true, "explore");
     }
-  }, [activeTab]);
+  }, [loadMovies]);
 
   // Filtering & Sorting on the currently loaded stream
   const filteredMovies = useMemo(() => {
     let result = [...movies];
+
+    // When searching for a specific query, guarantee only matching movies appear
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter((m) =>
+        (m.title && m.title.toLowerCase().includes(q)) ||
+        (m.actors && m.actors.toLowerCase().includes(q)) ||
+        (m.director && m.director.toLowerCase().includes(q)) ||
+        (m.genre && m.genre.toLowerCase().includes(q))
+      );
+    }
 
     // Filter by Minimum Rating
     if (minRating > 0) {
@@ -195,6 +277,13 @@ export default function App() {
       const yearB = parseInt(b.year, 10) || 0;
 
       switch (sortBy) {
+        case "popular_desc": {
+          const votesA = parseInt((a.imdbVotes || "0").replace(/,/g, ""), 10) || 0;
+          const votesB = parseInt((b.imdbVotes || "0").replace(/,/g, ""), 10) || 0;
+          const scoreA = (yearA >= 2018 ? 2000000 : 0) + votesA;
+          const scoreB = (yearB >= 2018 ? 2000000 : 0) + votesB;
+          return scoreB - scoreA;
+        }
         case "rating_desc":
           return ratingB - ratingA;
         case "rating_asc":
@@ -211,7 +300,24 @@ export default function App() {
     });
 
     return result;
-  }, [movies, minRating, sortBy]);
+  }, [movies, minRating, sortBy, searchQuery]);
+
+  // Auto-fill trigger ONLY in endless browse mode (never when searching for a specific title)
+  useEffect(() => {
+    if (
+      !isLoadingInitial &&
+      !isLoadingMore &&
+      !searchQuery.trim() &&
+      hasMore &&
+      filteredMovies.length < 12 &&
+      (activeTab === "explore" || activeTab === "trending" || activeTab === "topRated")
+    ) {
+      const timer = setTimeout(() => {
+        handleLoadMore();
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [filteredMovies.length, isLoadingInitial, isLoadingMore, activeTab, handleLoadMore, searchQuery, hasMore]);
 
   // User Actions
   const handleRateMovie = (imdbID, score) => {
@@ -220,12 +326,22 @@ export default function App() {
     showToast(`Rated ${score}/10! Thank you for your verdict.`, "star");
   };
 
-  const handleToggleWatchlist = (imdbID) => {
-    const updated = toggleWatchlist(imdbID);
+  const handleToggleWatchlist = (movieOrId) => {
+    let movieObj = typeof movieOrId === "object" ? movieOrId : null;
+    const imdbID = typeof movieOrId === "string" ? movieOrId : movieOrId?.imdbID;
+
+    if (!movieObj && imdbID) {
+      movieObj =
+        (selectedMovie?.imdbID === imdbID ? selectedMovie : null) ||
+        movies.find((m) => m.imdbID === imdbID) ||
+        FEATURED_MOVIES.find((m) => m.imdbID === imdbID);
+    }
+
+    const updated = toggleWatchlist(movieObj || imdbID);
     setWatchlist([...updated]);
     const added = updated.includes(imdbID);
     showToast(
-      added ? "Added to your Watchlist!" : "Removed from your Watchlist.",
+      added ? "Added to your Watch Later list!" : "Removed from Watch Later.",
       "watchlist"
     );
   };
@@ -261,7 +377,7 @@ export default function App() {
       {/* Header Navigation */}
       <Navbar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         watchlistCount={watchlist.length}
         ratedCount={Object.keys(userRatings).length}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -272,9 +388,14 @@ export default function App() {
         {activeTab === "watchlist" ? (
           <WatchlistView
             type="watchlist"
-            movies={FEATURED_MOVIES.concat(movies).filter(
-              (m, idx, arr) => arr.findIndex((x) => x.imdbID === m.imdbID) === idx
-            )}
+            movies={(() => {
+              const savedMoviesMap = getStoredWatchlistMovies();
+              const savedList = Object.values(savedMoviesMap);
+              const allMovies = [...savedList, ...FEATURED_MOVIES, ...movies];
+              return allMovies.filter(
+                (m, idx, arr) => arr.findIndex((x) => x.imdbID === m.imdbID) === idx
+              );
+            })()}
             userRatings={userRatings}
             watchlist={watchlist}
             favorites={favorites}
@@ -282,14 +403,19 @@ export default function App() {
             onToggleWatchlist={handleToggleWatchlist}
             onToggleFavorite={handleToggleFavorite}
             onWatchTrailer={setTrailerMovie}
-            onExploreClick={() => setActiveTab("explore")}
+            onExploreClick={() => handleTabChange("explore")}
           />
         ) : activeTab === "myRatings" ? (
           <WatchlistView
             type="myRatings"
-            movies={FEATURED_MOVIES.concat(movies).filter(
-              (m, idx, arr) => arr.findIndex((x) => x.imdbID === m.imdbID) === idx
-            )}
+            movies={(() => {
+              const savedMoviesMap = getStoredWatchlistMovies();
+              const savedList = Object.values(savedMoviesMap);
+              const allMovies = [...savedList, ...FEATURED_MOVIES, ...movies];
+              return allMovies.filter(
+                (m, idx, arr) => arr.findIndex((x) => x.imdbID === m.imdbID) === idx
+              );
+            })()}
             userRatings={userRatings}
             watchlist={watchlist}
             favorites={favorites}
@@ -297,14 +423,14 @@ export default function App() {
             onToggleWatchlist={handleToggleWatchlist}
             onToggleFavorite={handleToggleFavorite}
             onWatchTrailer={setTrailerMovie}
-            onExploreClick={() => setActiveTab("explore")}
+            onExploreClick={() => handleTabChange("explore")}
           />
         ) : (
           <>
             {/* Hero Spotlight (shown on Explore and Trending when not searching) */}
             {!searchQuery && activeTab !== "topRated" && (
               <HeroBanner
-                movies={FEATURED_MOVIES}
+                movies={activeTab === "trending" && filteredMovies.length > 0 ? filteredMovies.slice(0, 8) : FEATURED_MOVIES}
                 onSelectMovie={setSelectedMovie}
                 onWatchTrailer={setTrailerMovie}
                 watchlist={watchlist}
@@ -327,6 +453,7 @@ export default function App() {
                 onResetFilters={handleResetFilters}
                 isLiveApiSearching={isLoadingInitial}
                 source={apiSource}
+                activeTab={activeTab}
               />
 
               {/* Section Title & Live Endless Counter */}
@@ -341,23 +468,33 @@ export default function App() {
                 }}
               >
                 <div>
-                  <h2 style={{ fontSize: "1.5rem", margin: 0 }}>
-                    {searchQuery
-                      ? `Live Results for "${searchQuery}"`
-                      : activeTab === "topRated"
-                      ? "Top Rated Cinema Classics"
-                      : activeTab === "trending"
-                      ? "Trending Blockbusters"
-                      : "Endless Cinema Feed"}
+                  <h2 style={{ fontSize: "1.5rem", margin: 0, display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                    {searchQuery ? (
+                      `Live Results for "${searchQuery}"`
+                    ) : activeTab === "topRated" ? (
+                      "Top Rated Cinema Classics"
+                    ) : activeTab === "trending" ? (
+                      <>
+                        <Flame size={22} color="#f59e0b" fill="#e11d48" />
+                        <span>Trending Blockbusters</span>
+                      </>
+                    ) : (
+                      "Endless Cinema Feed"
+                    )}
                   </h2>
                   <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "2px" }}>
-                    Loaded {filteredMovies.length} movies from live movie web API &bull; Scroll down for more
+                    {searchQuery.trim()
+                      ? `Found ${filteredMovies.length} ${filteredMovies.length === 1 ? "movie" : "movies"} matching your search query`
+                      : activeTab === "trending"
+                      ? `Ranked by global popularity and viral momentum • Showing ${filteredMovies.length} blockbusters`
+                      : `Loaded ${filteredMovies.length} movies from live movie web API • Scroll down for more`}
                   </p>
                 </div>
 
+                {/* Endless Streaming Tag (hidden per user request) */}
                 <div
                   className="badge badge-cyan"
-                  style={{ padding: "0.4rem 0.8rem", fontSize: "0.78rem" }}
+                  style={{ display: "none" }}
                 >
                   <Sparkles size={13} />
                   <span>Endless Streaming Active</span>
@@ -416,10 +553,11 @@ export default function App() {
                       gap: "1.75rem"
                     }}
                   >
-                    {filteredMovies.map((movie) => (
+                    {filteredMovies.map((movie, idx) => (
                       <MovieCard
                         key={movie.imdbID}
                         movie={movie}
+                        ranking={activeTab === "trending" && !searchQuery ? idx + 1 : undefined}
                         userRating={userRatings[movie.imdbID]?.rating}
                         inWatchlist={watchlist.includes(movie.imdbID)}
                         isFavorite={favorites.includes(movie.imdbID)}
@@ -432,61 +570,63 @@ export default function App() {
                   </div>
 
                   {/* Endless Scroll Sentinel & Loading Indicator */}
-                  <div
-                    ref={sentinelRef}
-                    style={{
-                      padding: "3rem 1rem",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "1rem",
-                      marginTop: "1.5rem"
-                    }}
-                  >
-                    {isLoadingMore ? (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.75rem",
-                          color: "var(--accent-gold)",
-                          fontWeight: 600,
-                          fontSize: "0.95rem"
-                        }}
-                      >
-                        <Loader2 size={24} className="animate-spin" />
-                        <span>Streaming next batch of movies from web API...</span>
-                      </div>
-                    ) : hasMore ? (
-                      <button
-                        onClick={handleLoadMore}
-                        className="btn btn-secondary"
-                        style={{
-                          padding: "0.75rem 2rem",
-                          borderRadius: "var(--radius-full)",
-                          fontSize: "0.95rem",
-                          gap: "0.6rem"
-                        }}
-                      >
-                        <ArrowDown size={18} />
-                        Load More Movies
-                      </button>
-                    ) : (
-                      <div
-                        style={{
-                          color: "var(--text-muted)",
-                          fontSize: "0.85rem",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.5rem"
-                        }}
-                      >
-                        <Check size={16} color="var(--accent-emerald)" />
-                        <span>All available movie titles loaded</span>
-                      </div>
-                    )}
-                  </div>
+                  {hasMore ? (
+                    <div
+                      ref={sentinelRef}
+                      style={{
+                        padding: "3rem 1rem",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "1rem",
+                        marginTop: "1.5rem"
+                      }}
+                    >
+                      {isLoadingMore ? (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.75rem",
+                            color: "var(--accent-gold)",
+                            fontWeight: 600,
+                            fontSize: "0.95rem"
+                          }}
+                        >
+                          <Loader2 size={24} className="animate-spin" />
+                          <span>Streaming next batch of movies from web API...</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleLoadMore}
+                          className="btn btn-secondary"
+                          style={{
+                            padding: "0.75rem 2.2rem",
+                            borderRadius: "var(--radius-full)",
+                            fontSize: "0.95rem",
+                            gap: "0.6rem"
+                          }}
+                        >
+                          <ArrowDown size={18} />
+                          <span>Load More Movies</span>
+                        </button>
+                      )}
+                    </div>
+                  ) : searchQuery.trim() ? (
+                    <div
+                      style={{
+                        padding: "2.5rem 1rem",
+                        textAlign: "center",
+                        color: "var(--text-muted)",
+                        fontSize: "0.88rem",
+                        borderTop: "1px solid var(--border-glass)",
+                        marginTop: "2.5rem"
+                      }}
+                    >
+                      Showing all {filteredMovies.length} results matching &ldquo;{searchQuery}&rdquo;
+                    </div>
+                  ) : null}
                 </>
               )}
             </div>
@@ -513,28 +653,26 @@ export default function App() {
             gap: "1.5rem"
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <div
+          <div
+            onClick={() => {
+              setActiveTab("explore");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            className="brand-lockup"
+            style={{ display: "flex", alignItems: "center", gap: "0.85rem", cursor: "pointer", userSelect: "none" }}
+          >
+            <CinemaLogo size={42} />
+            <img
+              src={brandingImg}
+              alt="Cinema साथी"
+              className="brand-title-img"
               style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "10px",
-                background: "linear-gradient(135deg, #e11d48, #f59e0b)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
+                height: "38px",
+                width: "auto",
+                objectFit: "contain",
+                display: "block"
               }}
-            >
-              <Film size={18} color="#ffffff" />
-            </div>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: "1.15rem" }}>
-                Cinema<span style={{ color: "var(--accent-gold)" }}>Sathi</span>
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                सिनेमा साथी &bull; Endless Movie Stream & Rating Portal
-              </div>
-            </div>
+            />
           </div>
 
           <div
@@ -556,10 +694,7 @@ export default function App() {
             </button>
             <span>&bull;</span>
             <button
-              onClick={() => {
-                setActiveTab("explore");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
+              onClick={() => handleTabChange("explore")}
               style={{ color: "var(--text-secondary)", cursor: "pointer", background: "none", border: "none" }}
             >
               Back to Top
@@ -601,6 +736,9 @@ export default function App() {
           }}
         />
       )}
+
+      {/* Login Modal with Google and Phone Number functionality */}
+      <LoginModal />
     </div>
   );
 }

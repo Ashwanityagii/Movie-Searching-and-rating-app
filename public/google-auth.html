@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in - Google Accounts</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    body {
+      background: #ffffff;
+      color: #202124;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 440px;
+      padding: 40px;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      text-align: center;
+      background: #ffffff;
+    }
+    .google-logo {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 500;
+      color: #202124;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: 16px;
+      color: #5f6368;
+      margin-bottom: 24px;
+    }
+    .subtitle strong {
+      color: #202124;
+    }
+    .account-list {
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid #e0e0e0;
+      border-bottom: 1px solid #e0e0e0;
+      margin-bottom: 24px;
+    }
+    .account-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 12px;
+      cursor: pointer;
+      text-align: left;
+      border-radius: 4px;
+      transition: background 0.15s ease;
+      background: transparent;
+      border: none;
+      width: 100%;
+    }
+    .account-item:hover {
+      background: #f8f9fa;
+    }
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #4285F4;
+      color: #ffffff;
+      font-weight: 500;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .account-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .account-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: #202124;
+      margin-bottom: 2px;
+    }
+    .account-email {
+      font-size: 12px;
+      color: #5f6368;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .use-another-form {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      text-align: left;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #e0e0e0;
+    }
+    .input-field {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 14px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      outline: none;
+      color: #202124;
+    }
+    .input-field:focus {
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 1px #1a73e8;
+    }
+    .btn-submit {
+      background: #1a73e8;
+      color: #ffffff;
+      font-weight: 500;
+      font-size: 14px;
+      padding: 10px 24px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      align-self: flex-end;
+      transition: background 0.15s ease;
+    }
+    .btn-submit:hover {
+      background: #1557b0;
+    }
+    .footer-note {
+      font-size: 12px;
+      color: #5f6368;
+      line-height: 1.5;
+      text-align: left;
+    }
+    .footer-note a {
+      color: #1a73e8;
+      text-decoration: none;
+    }
+    .footer-note a:hover {
+      text-decoration: underline;
+    }
+    .spinner {
+      display: none;
+      width: 24px;
+      height: 24px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #1a73e8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 20px auto 0 auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <!-- Google SVG Logo -->
+    <svg class="google-logo" viewBox="0 0 24 24">
+      <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"/>
+      <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+      <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+    </svg>
+
+    <h1>Choose an account</h1>
+    <p class="subtitle">to continue to <strong>CinemaSathi</strong></p>
+
+    <!-- Account List -->
+    <div class="account-list" id="accountList">
+      <!-- Account 1 -->
+      <button class="account-item" onclick="selectAccount('Ashwani Tyagi', 'ashwanityagi@gmail.com', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80')">
+        <div class="avatar">
+          <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80" alt="Avatar">
+        </div>
+        <div class="account-info">
+          <div class="account-name">Ashwani Tyagi</div>
+          <div class="account-email">ashwanityagi@gmail.com</div>
+        </div>
+      </button>
+
+      <!-- Account 2 -->
+      <button class="account-item" onclick="selectAccount('Cinema Fan', 'cinemasathi.user@gmail.com', 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&q=80')">
+        <div class="avatar" style="background: #e11d48;">
+          C
+        </div>
+        <div class="account-info">
+          <div class="account-name">Cinema Fan</div>
+          <div class="account-email">cinemasathi.user@gmail.com</div>
+        </div>
+      </button>
+
+      <!-- Use another account item -->
+      <button class="account-item" id="btnUseAnother" onclick="toggleCustomInput()">
+        <div class="avatar" style="background: #e8eaed; color: #5f6368;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+          </svg>
+        </div>
+        <div class="account-info">
+          <div class="account-name">Use another Google account</div>
+          <div class="account-email">Enter your own name & email</div>
+        </div>
+      </button>
+    </div>
+
+    <!-- Custom Account Input Form -->
+    <form class="use-another-form" id="customForm" onsubmit="handleCustomSubmit(event)">
+      <div>
+        <input type="text" id="customName" class="input-field" placeholder="Full Name (e.g. Rahul Sharma)" required>
+      </div>
+      <div>
+        <input type="email" id="customEmail" class="input-field" placeholder="Gmail address (e.g. rahul@gmail.com)" required>
+      </div>
+      <button type="submit" class="btn-submit">Continue</button>
+    </form>
+
+    <div class="spinner" id="loadingSpinner"></div>
+
+    <p class="footer-note" id="footerNote">
+      To continue, Google will share your name, email address, and profile picture with CinemaSathi. See CinemaSathi's <a href="#">Privacy Policy</a> and <a href="#">Terms of Service</a>.
+    </p>
+  </div>
+
+  <script>
+    function toggleCustomInput() {
+      const form = document.getElementById('customForm');
+      const isVisible = form.style.display === 'flex';
+      form.style.display = isVisible ? 'none' : 'flex';
+      if (!isVisible) {
+        document.getElementById('customName').focus();
+      }
+    }
+
+    function selectAccount(name, email, avatar) {
+      document.getElementById('accountList').style.opacity = '0.4';
+      document.getElementById('loadingSpinner').style.display = 'block';
+
+      const profile = {
+        id: 'google_' + Math.random().toString(36).substring(2, 10),
+        name: name,
+        email: email,
+        avatar: avatar || ('https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=4285F4&color=fff'),
+        method: 'google'
+      };
+
+      setTimeout(function() {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({
+            type: 'GOOGLE_AUTH_SUCCESS',
+            profile: profile
+          }, '*');
+          window.close();
+        } else {
+          // Fallback if opened standalone
+          localStorage.setItem('cinemasathi_auth_user', JSON.stringify(profile));
+          window.location.href = '/';
+        }
+      }, 500);
+    }
+
+    function handleCustomSubmit(e) {
+      e.preventDefault();
+      const name = document.getElementById('customName').value.trim();
+      const email = document.getElementById('customEmail').value.trim();
+      if (!name || !email) return;
+
+      selectAccount(name, email, null);
+    }
+  </script>
+</body>
+</html>
